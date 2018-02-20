@@ -8,9 +8,6 @@ var callRemote = function(url, cb) {
     }
     xhr.send();
 }
-
-
-var manifestUrls = {};
 var urls = [];
 var slices = {};
 var videoType = "";
@@ -22,14 +19,11 @@ chrome.extension.onMessage.addListener(function(request, sender, send_response) 
     if (request.type === "slices") {
     	slices = request.value;        
 	}
-    if (request.type === "manifestUrls") {
-    	manifestUrls = request.value;        
-	}
 });
 
 
 
-var processData = function(details, regex) {
+var processData = function(details, regex, regex2) {
     if (urls.indexOf(details.url) === -1) {           
        
         urls.push(details.url);
@@ -38,13 +32,12 @@ var processData = function(details, regex) {
         var urlObj = new URL(details.url);        
 
         callRemote(details.url, function(resp) {
-                    
 
             slices[details.url] = [];             
 
             var match = regex.exec(resp);
-            //if (!match)
-               // match = regex2.exec(resp);
+            if (!match)
+                match = regex2.exec(resp);
 
             while(match != null) {
                 // remove the first '/' in the matched url
@@ -94,65 +87,15 @@ var processData = function(details, regex) {
 
         });            
     }
-};
+}
 
-
-var replacePartialURLs = function(urlObj, manifestUrls) {    
-    
-    for (var key in manifestUrls) {
-        var curManif = manifestUrls[key];
-        
-        if (curManif.length > 0) {
-        
-            if (curManif[0].url.indexOf('http://') != -1 || curManif[0].url.indexOf('https://') != -1) {  
-                continue;
-            }
-
-            if (key.indexOf(urlObj.host) !== -1) {
-                var correctPartURL;
-                for (var i = 0; i < curManif.length; i++) {  
-                    
-                    var urlWithoutToken = curManif[i].url.match(/.+\.m3u8/);
-                    if (urlWithoutToken) {
-                        var foundURLPart = urlObj.href.match(urlWithoutToken); 
-
-                        if (foundURLPart) {
-                            correctPartURL =  urlObj.href.slice(0, urlObj.href.indexOf(foundURLPart[0])); 
-                            break;
-                        }
-                    }
-                    
-                }
-                
-                if (correctPartURL) {
-                    for (var j = 0; j < curManif.length; j++) {  
-                        curManif[j].url = correctPartURL + curManif[j].url;
-                    }
-                }
-            }       
-        }
-    }
-};
-
-
-var processDataHLS = function(manifestUrls) {
-    
-    Object.keys(manifestUrls).forEach(function(key,index) {
-                
-       if (manifestUrls[key].length > 0) { 
-            slices[key] = manifestUrls[key]; 
-        }
-    });
-    
-    chrome.tabs.executeScript(null, {code: "var slices = " + slices + ";"}, function() {
-        chrome.storage.local.set({ 'slices': slices, 'videoType': videoType }, function() {    
-        }); 
-    });      
-};
+//chrome.storage.local.clear();
 
 
 chrome.webRequest.onCompleted.addListener(function(details) {
     
+
+    //var extension = details.url.split('.').pop();
     var extensionMatch = details.url.match(/\.([^\./\?]+)($|\?)/);
     var extension;
     
@@ -162,59 +105,23 @@ chrome.webRequest.onCompleted.addListener(function(details) {
         var regex, regex2;
     
         // m3u8 (apple) videos
-        if(extension.indexOf('m3u8') !== -1) {
-            
-            if (!manifestUrls[details.url]) {
-                // read master m3u8
-                callRemote(details.url, function(resp) {
-                    
-                    // list of objects [RESOLUTION, URL]
-                    var resolutionAndURLsList = [];
-                    
-                    var videoInfoRegex = /EXT-X-STREAM-INF:(.+RESOLUTION=(\d+x\d+))?.*(?:\n|\r\n)(.+\.m3u8.*)/gi; 
-                    var match = videoInfoRegex.exec(resp);                    
-                    
-                    while (match) {
-                        
-                        var curResAnURLObj = {};
-                        // resolution
-                        if (match[2]) {
-                            curResAnURLObj.resolution = match[2];
-                        }
-                        // URL
-                        if (match[3]) {
-                            curResAnURLObj.url = match[3];
-                        }
-                        
-                        resolutionAndURLsList.push(curResAnURLObj);                        
-                        match = videoInfoRegex.exec(resp);
-                    }
-                    
-                    var manifestVidRegex = /#EXTINF:.+(?:\n|\r\n)(.+)/gi;
-                    if (resp.match(manifestVidRegex)) {
-                        
-                        var urlObj = new URL(details.url); 
-                        replacePartialURLs(urlObj, manifestUrls);
-                    }
-                    
-                    manifestUrls[details.url] = resolutionAndURLsList;
-                    
-                });
-            }
+        if(extension.indexOf('m3u8') !== -1){
 
-            videoType = 'hls';
-            processDataHLS(manifestUrls);
+           videoType = 'hls';
+           regex = /#EXTINF:.+\n(.+)/gi; ///#EXTINF:.+?,\n(.+)/gi;
+           regex2 = /#EXTINF:.+\r\n(.+)/gi; ///#EXTINF:.+?,\r\n(.+)/gi;
+
         }
         // f4f (adobe) videos
         else if(extension.indexOf('f4m') !== -1) {
 
             videoType = 'hds';
             regex = /url="(.*?)"/gi;
-            if (regex) {
-                processData(details, regex);
-            }
         }
-        
+
+        if (regex) {
+            processData(details, regex, regex2);
+        }
     }
     
 
