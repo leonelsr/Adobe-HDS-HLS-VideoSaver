@@ -111,10 +111,15 @@ var replacePartialURLs = function(urlObj, manifestUrls) {
             if (key.indexOf(urlObj.host) !== -1) {
                 var correctPartURL;
                 for (var i = 0; i < curManif.length; i++) {  
-                    var foundURLPart = urlObj.href.match(curManif[i].url); 
-                    if (foundURLPart) {
-                        correctPartURL =  urlObj.href.replace(new RegExp(foundURLPart[0], "g"), ""); 
-                        break;
+                    
+                    var urlWithoutToken = curManif[i].url.match(/.+\.m3u8/);
+                    if (urlWithoutToken) {
+                        var foundURLPart = urlObj.href.match(urlWithoutToken); 
+
+                        if (foundURLPart) {
+                            correctPartURL =  urlObj.href.slice(0, urlObj.href.indexOf(foundURLPart[0])); 
+                            break;
+                        }
                     }
                     
                 }
