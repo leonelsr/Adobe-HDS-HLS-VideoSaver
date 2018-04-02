@@ -26,6 +26,9 @@
             document.getElementById('hlsProcess').appendChild(partSpan);
             var br = document.createElement('br');
             document.getElementById('hlsProcess').appendChild(br);
+
+            // Automatically scroll to the bottom of the progress div
+            document.getElementById('hlsProcess').scrollTo(0,document.getElementById('hlsProcess').scrollHeight);
         }
         else {
             progressBars[num].value = val;
