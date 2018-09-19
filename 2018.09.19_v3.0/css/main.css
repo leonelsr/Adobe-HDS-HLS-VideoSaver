@@ -1,0 +1,13 @@
+body {
+    padding-bottom: 120px;
+}
+
+.hls-url { text-decoration: underline;}
+#hlsPopup {
+    width:350px;height:170px;text-align:left;position:relative;
+}
+
+
+progress.red { background: red; }
+progress.red::-webkit-progress-bar-value { background-color:red; }
+progress.red::-webkit-progress-value { background-color:red; }
